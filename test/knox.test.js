@@ -9,7 +9,8 @@ var assert = require('assert')
 
 try {
   var auth = JSON.parse(fs.readFileSync('auth', 'ascii'));
-  var client = knox.createClient(auth);
+  var client = knox.createClient(auth[0]);
+  var other = knox.createClient(auth[1]);
 } catch (err) {
   console.error('`make test` requires ./auth to contain a JSON string with');
   console.error('`key, secret, and bucket in order to run tests.');
@@ -188,6 +189,27 @@ module.exports = {
       assert.equal(13, res.headers['content-length'])
       done();
     });
+  },
+  
+  'test .copy()': function(done){
+    client.copy('/test/user2.json','/test/user.json').on('response',function(res){
+      assert.equal(200, res.statusCode);
+      done();
+    }).end();
+  },
+  
+  'test .copy() from same client': function(done){
+    client.copy('/test/user3.json',{'/test/user.json':client}).on('response',function(res){
+      assert.equal(200, res.statusCode);
+      done();
+    }).end();
+  },
+  
+  'test .copy() from other client': function(done){
+    other.copy('/test/user.json',{'/test/user.json':client}).on('response',function(res){
+      assert.equal(200, res.statusCode);
+      done();
+    }).end();
   },
   
   'test .del()': function(done){
