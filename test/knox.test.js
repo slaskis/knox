@@ -111,6 +111,46 @@ module.exports = {
       done();
     });
   },
+
+  'test .createWritableStream()': function(done){
+    var stream = fs.createReadStream(jsonFixture);
+    var multipart = client.createWritableStream('/test/user.json', {
+      'Content-Type': 'application/json'
+    });
+    
+    multipart.on('response', function(res){
+      assert.equal(200, res.statusCode);
+      done();
+    }).on('error', function(e){
+      done(e);
+    });
+
+    require('util').pump(stream, multipart);
+  },
+
+  'test .createWritableStream() >5MB': function(done){
+    this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
+    var source = require('url').parse('http://upload.wikimedia.org/wikipedia/commons/2/21/Earthlights_dmsp.jpg');
+
+    require('http').get(source, function (res){
+      assert.equal(200, res.statusCode);
+
+      var length = Number(res.headers['content-length']);
+      assert.ok(length > 5*1024*1024);
+
+      var multipart = client.createWritableStream('/test/image.jpg', {
+        'Content-Type': 'image/jpeg'
+      });
+
+      require('util').pump(res, multipart);
+      multipart.on('response', function() {
+        assert.equal(200, res.statusCode);
+        done()
+      }).on('error', function(e){
+        done(e);
+      });
+    });
+  },
   
   'test .getFile()': function(done){
     client.getFile('/test/user.json', function(err, res){
