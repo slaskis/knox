@@ -3,7 +3,8 @@
  * Module dependencies.
  */
 
-var knox = require('knox')
+var assert = require('assert')
+  , knox = require('../lib/knox')
   , fs = require('fs');
 
 try {
@@ -18,11 +19,11 @@ try {
 var jsonFixture = __dirname + '/fixtures/user.json';
 
 module.exports = {
-  'test .version': function(assert){
-    assert.match(knox.version, /^\d+\.\d+\.\d+$/);
+  'test .version': function(){
+    assert.ok(/^\d+\.\d+\.\d+$/.test(knox.version));
   },
   
-  'test .createClient() invalid': function(assert){
+  'test .createClient() invalid': function(){
     var err;
     try {
       knox.createClient({});
@@ -38,17 +39,9 @@ module.exports = {
       err = e;
     }
     assert.equal('aws "secret" required', err.message);
-    
-    var err;
-    try {
-      knox.createClient({ key: 'foo', secret: 'bar' });
-    } catch (e) {
-      err = e;
-    }
-    assert.equal('aws "bucket" required', err.message);
   },
   
-  'test .createClient() valid': function(assert){
+  'test .createClient() valid': function(){
     var client = knox.createClient({
         key: 'foobar'
       , secret: 'baz'
@@ -58,10 +51,10 @@ module.exports = {
     assert.equal('foobar', client.key);
     assert.equal('baz', client.secret);
     assert.equal('misc', client.bucket);
-    assert.equal('s3.amazonaws.com', client.endpoint);
+    assert.equal('misc.s3.amazonaws.com', client.endpoint);
   },
   
-  'test .createClient() custom endpoint': function(assert){
+  'test .createClient() custom endpoint': function(){
     var client = knox.createClient({
         key: 'foobar'
       , secret: 'baz'
@@ -72,7 +65,7 @@ module.exports = {
     assert.equal('s3-eu-west-1.amazonaws.com', client.endpoint);
   },
 
-  'test .putFile()': function(assert, done){
+  'test .putFile()': function(done){
     var n = 0;
     client.putFile(jsonFixture, '/test/user2.json', function(err, res){
       assert.ok(!err, 'putFile() got an error!');
@@ -84,7 +77,7 @@ module.exports = {
     });
   },
   
-  'test .put()': function(assert, done){
+  'test .put()': function(done){
     var n = 0;
     fs.stat(jsonFixture, function(err, stat){
       if (err) throw err;
@@ -98,10 +91,10 @@ module.exports = {
         req.on('response', function(res){
           assert.equal(200, res.statusCode);
           assert.equal(
-              'http://'+client.endpoint+'/'+client.bucket+'/test/user.json'
+              'http://'+client.bucket+'.s3.amazonaws.com/test/user.json'
             , client.url('/test/user.json'));
           assert.equal(
-              'http://'+client.endpoint+'/'+client.bucket+'/test/user.json'
+              'http://'+client.bucket+'.s3.amazonaws.com/test/user.json'
             , req.url);
           done();
         });
@@ -110,7 +103,7 @@ module.exports = {
     });
   },
   
-  'test .putStream()': function(assert, done){
+  'test .putStream()': function(done){
     var stream = fs.createReadStream(jsonFixture);
     client.putStream(stream, '/test/user.json', function(err, res){
       assert.ok(!err);
@@ -118,8 +111,48 @@ module.exports = {
       done();
     });
   },
+
+  'test .createWritableStream()': function(done){
+    var stream = fs.createReadStream(jsonFixture);
+    var multipart = client.createWritableStream('/test/user.json', {
+      'Content-Type': 'application/json'
+    });
+    
+    multipart.on('response', function(res){
+      assert.equal(200, res.statusCode);
+      done();
+    }).on('error', function(e){
+      done(e);
+    });
+
+    require('util').pump(stream, multipart);
+  },
+
+  'test .createWritableStream() >5MB': function(done){
+    this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
+    var source = require('url').parse('http://upload.wikimedia.org/wikipedia/commons/2/21/Earthlights_dmsp.jpg');
+
+    require('http').get(source, function (res){
+      assert.equal(200, res.statusCode);
+
+      var length = Number(res.headers['content-length']);
+      assert.ok(length > 5*1024*1024);
+
+      var multipart = client.createWritableStream('/test/image.jpg', {
+        'Content-Type': 'image/jpeg'
+      });
+
+      require('util').pump(res, multipart);
+      multipart.on('response', function() {
+        assert.equal(200, res.statusCode);
+        done()
+      }).on('error', function(e){
+        done(e);
+      });
+    });
+  },
   
-  'test .getFile()': function(assert, done){
+  'test .getFile()': function(done){
     client.getFile('/test/user.json', function(err, res){
       assert.ok(!err);
       assert.equal(200, res.statusCode);
@@ -129,7 +162,7 @@ module.exports = {
     });
   },
   
-  'test .get()': function(assert, done){
+  'test .get()': function(done){
     client.get('/test/user.json').on('response', function(res){
       assert.equal(200, res.statusCode);
       assert.equal('application/json', res.headers['content-type'])
@@ -138,7 +171,7 @@ module.exports = {
     }).end();
   },
   
-  'test .head()': function(assert, done){
+  'test .head()': function(done){
     client.head('/test/user.json').on('response', function(res){
       assert.equal(200, res.statusCode);
       assert.equal('application/json', res.headers['content-type'])
@@ -147,7 +180,7 @@ module.exports = {
     }).end();
   },
   
-  'test .headFile()': function(assert, done){
+  'test .headFile()': function(done){
     client.headFile('/test/user.json', function(err, res){
       assert.ok(!err);
       assert.equal(200, res.statusCode);
@@ -157,14 +190,14 @@ module.exports = {
     });
   },
   
-  'test .del()': function(assert, done){
+  'test .del()': function(done){
     client.del('/test/user.json').on('response', function(res){
       assert.equal(204, res.statusCode);
       done();
     }).end();
   },
   
-  'test .deleteFile()': function(assert, done){
+  'test .deleteFile()': function(done){
     client.deleteFile('/test/user2.json', function(err, res){
       assert.ok(!err);
       assert.equal(204, res.statusCode);
@@ -172,16 +205,16 @@ module.exports = {
     });
   },
   
-  'test .get() 404': function(assert, done){
-    client.get('/test/user.json').on('response', function(res){
-      assert.equal(404, res.statusCode);
+  'test .get() 403': function(done){
+    client.get('/test/does-not-exist.json').on('response', function(res){
+      assert.equal(403, res.statusCode);
       done();
     }).end();
   },
   
-  'test .head() 404': function(assert, done){
-    client.head('/test/user.json').on('response', function(res){
-      assert.equal(404, res.statusCode);
+  'test .head() 403': function(done){
+    client.head('/test/does-not-exist.json').on('response', function(res){
+      assert.equal(403, res.statusCode);
       done();
     }).end();
   },
