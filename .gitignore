@@ -1,3 +1,5 @@
 .DS_Store
 test.js
 auth
+.project
+node_modules
