@@ -113,9 +113,9 @@ module.exports = {
     });
   },
 
-  'test .createWritableStream()': function(done){
+  'test .createWriteStream()': function(done){
     var stream = fs.createReadStream(jsonFixture);
-    var multipart = client.createWritableStream('/test/user.json', {
+    var multipart = client.createWriteStream('/test/user.json', {
       'Content-Type': 'application/json'
     });
     
@@ -129,7 +129,7 @@ module.exports = {
     require('util').pump(stream, multipart);
   },
 
-  'test .createWritableStream() >5MB': function(done){
+  'test .createWriteStream() >5MB': function(done){
     this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
     var source = require('url').parse('http://upload.wikimedia.org/wikipedia/commons/2/21/Earthlights_dmsp.jpg');
 
@@ -139,7 +139,7 @@ module.exports = {
       var length = Number(res.headers['content-length']);
       assert.ok(length > 5*1024*1024);
 
-      var multipart = client.createWritableStream('/test/image.jpg', {
+      var multipart = client.createWriteStream('/test/image.jpg', {
         'Content-Type': 'image/jpeg'
       });
 
@@ -199,14 +199,14 @@ module.exports = {
   },
   
   'test .copy() from same client': function(done){
-    client.copy('/test/user3.json',{'/test/user.json':client}).on('response',function(res){
+    client.copy('/test/user3.json',{filename:'/test/user.json',client:client}).on('response',function(res){
       assert.equal(200, res.statusCode);
       done();
     }).end();
   },
   
   'test .copy() from other client': function(done){
-    other.copy('/test/user.json',{'/test/user.json':client}).on('response',function(res){
+    other.copy('/test/user.json',{filename:'/test/user.json',client:client}).on('response',function(res){
       assert.equal(200, res.statusCode);
       done();
     }).end();
@@ -227,51 +227,17 @@ module.exports = {
     });
   },
   
-  'test .get() 403': function(done){
+  'test .get() 404': function(done){
     client.get('/test/does-not-exist.json').on('response', function(res){
-      assert.equal(403, res.statusCode);
+      assert.equal(404, res.statusCode);
       done();
     }).end();
   },
   
-  'test .head() 403': function(done){
+  'test .head() 404': function(done){
     client.head('/test/does-not-exist.json').on('response', function(res){
-      assert.equal(403, res.statusCode);
+      assert.equal(404, res.statusCode);
       done();
     }).end();
-  },
-  
-  'test for multipart upload and commit': function(assert, done){
-  	var resourceName = '/test/blob.bin';
-  	client.beginUpload(resourceName, function(e, upinfo){
-  		assert.ok(e === null);
-  		var buf = new Buffer('Hello, world!', 'utf8');
-  		client.putPart(resourceName, upinfo.uploadId, 1, buf, function(e, pinfo){
-  			assert.ok(e === null);
-  			assert.equal(1, pinfo.partNumber);
-  			assert.ok(pinfo.etag !== null);
-  			client.completeUpload(resourceName, upinfo.uploadId, [pinfo], function(e, cinfo){
-  				assert.ok(e === null);
-  				done();
-  			});
-  		});
-  	});
-  },
-  
-  'test for multipart upload and abort': function(assert, done){
-  	var resourceName = '/test/blob.bin';
-  	client.beginUpload(resourceName, function(e, upinfo){
-  		assert.ok(e === null);
-  		var buf = new Buffer('Hello, world!', 'utf8');
-  		client.putPart(resourceName, upinfo.uploadId, 1, buf, function(e, pinfo){
-  			assert.ok(e === null);
-  			assert.equal(1, pinfo.partNumber);
-  			assert.ok(pinfo.etag !== null);
-  			client.abortUpload(resourceName, upinfo.uploadId, function(success){
-  				assert.ok(success);
-  				done();
-  			});
-  		});
-  	});
   }
 };
