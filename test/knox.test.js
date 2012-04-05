@@ -17,7 +17,9 @@ try {
   process.exit(1);
 }
 
-var jsonFixture = __dirname + '/fixtures/user.json';
+var jsonFixture = __dirname + '/fixtures/user.json'
+  , imageFixture = __dirname + '/fixtures/image-big.jpg'
+  , imageUrl = 'http://upload.wikimedia.org/wikipedia/commons/2/21/Earthlights_dmsp.jpg';
 
 module.exports = {
   'test .version': function(){
@@ -129,9 +131,30 @@ module.exports = {
     require('util').pump(stream, multipart);
   },
 
-  'test .createWriteStream() >5MB': function(done){
+  'test .createWriteStream() >5MB (file)': function(done){
     this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
-    var source = require('url').parse('http://upload.wikimedia.org/wikipedia/commons/2/21/Earthlights_dmsp.jpg');
+    var stream = fs.createReadStream(imageFixture)
+      , size = fs.statSync(imageFixture).size;
+
+    var multipart = client.createWriteStream('/test/image-big-file.jpg', {
+      'Content-Type': 'image/jpeg'
+    });
+
+    multipart.on('response', function(res) {
+      assert.equal(200, res.statusCode);
+      client.headFile('/test/image-big-file.jpg',function(err,res){
+        assert.equal(size,Number(res.headers['content-length']))
+        done()
+      })
+    }).on('error',done);
+
+    require('util').pump(stream, multipart);
+  },
+
+  'test .createWriteStream() >5MB (http)': function(done){
+    this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
+    var source = require('url').parse(imageUrl)
+      , size = fs.statSync(imageFixture).size; // assumes url == fixture
 
     require('http').get(source, function (res){
       assert.equal(200, res.statusCode);
@@ -139,20 +162,22 @@ module.exports = {
       var length = Number(res.headers['content-length']);
       assert.ok(length > 5*1024*1024);
 
-      var multipart = client.createWriteStream('/test/image.jpg', {
+      var multipart = client.createWriteStream('/test/image-big-http.jpg', {
         'Content-Type': 'image/jpeg'
       });
 
-      require('util').pump(res, multipart);
-      multipart.on('response', function() {
+      multipart.on('response', function(res) {
         assert.equal(200, res.statusCode);
-        done()
-      }).on('error', function(e){
-        done(e);
-      });
+        client.headFile('/test/image-big-http.jpg',function(err,res){
+          assert.equal(size,Number(res.headers['content-length']))
+          done()
+        })
+      }).on('error', done);
+
+      require('util').pump(res, multipart);
     });
   },
-  
+
   'test .getFile()': function(done){
     client.getFile('/test/user.json', function(err, res){
       assert.ok(!err);
