@@ -107,26 +107,34 @@ module.exports = {
   },
   
   'test .putStream()': function(done){
-    var stream = fs.createReadStream(jsonFixture);
+    var stream = fs.createReadStream(jsonFixture)
+      , size = fs.statSync(jsonFixture).size;
+      
     client.putStream(stream, 'test/user.json', function(err, res){
       assert.ok(!err);
       if (100 !== res.statusCode) assert.equal(200, res.statusCode);
-      done();
+      client.headFile('/test/user.json',function(err,res){
+        assert.equal(size,Number(res.headers['content-length']))
+        done()
+      })
     });
   },
 
   'test .createWriteStream()': function(done){
-    var stream = fs.createReadStream(jsonFixture);
+    var stream = fs.createReadStream(jsonFixture)
+      , size = fs.statSync(jsonFixture).size;
+
     var multipart = client.createWriteStream('/test/user.json', {
       'Content-Type': 'application/json'
     });
     
     multipart.on('response', function(res){
       assert.equal(200, res.statusCode);
-      done();
-    }).on('error', function(e){
-      done(e);
-    });
+      client.headFile('/test/user.json',function(err,res){
+        assert.equal(size,Number(res.headers['content-length']))
+        done()
+      })
+    }).on('error', done);
 
     require('util').pump(stream, multipart);
   },
