@@ -11,6 +11,7 @@ try {
   var auth = JSON.parse(fs.readFileSync('auth', 'ascii'));
   var client = knox.createClient(auth[0]);
   var other = knox.createClient(auth[1]);
+  var invalid = knox.createClient(auth[2]);
 } catch (err) {
   console.error('`make test` requires ./auth to contain a JSON string with');
   console.error('`key, secret, and bucket in order to run tests.');
@@ -120,6 +121,15 @@ module.exports = {
     });
   },
 
+  'test .putStream() to invalid client': function(done){
+    var stream = fs.createReadStream(jsonFixture);
+      
+    invalid.putStream(stream, 'test/user.json', function(err){
+      assert.ok(err);
+      done()
+    });
+  },
+
   'test .createWriteStream()': function(done){
     var stream = fs.createReadStream(jsonFixture)
       , size = fs.statSync(jsonFixture).size;
@@ -137,6 +147,16 @@ module.exports = {
     }).on('error', done);
 
     require('util').pump(stream, multipart);
+  },
+
+  'test .createWriteStream() to invalid client': function(done){
+    var stream = fs.createReadStream(jsonFixture);
+      
+    var multipart = invalid.createWriteStream(stream);
+    multipart.on('error',function(err){
+      assert.ok(err);
+      done();
+    })
   },
 
   'test .createWriteStream() >5MB (file)': function(done){
@@ -196,6 +216,13 @@ module.exports = {
     });
   },
   
+  'test .getFile() from invalid client': function(done){
+    invalid.getFile('/test/user.json', function(err, res){
+      assert.equal(403, res.statusCode);
+      done();
+    });
+  },
+
   'test .get()': function(done){
     client.get('/test/user.json').on('response', function(res){
       assert.equal(200, res.statusCode);
@@ -244,6 +271,14 @@ module.exports = {
       done();
     }).end();
   },
+  
+  'test .copy() from invalid client': function(done){
+    invalid.copy('/test/user.json',{filename:'/test/user.json',client:client}).on('response',function(res){
+      assert.equal(403, res.statusCode);
+      done();
+    }).end();
+  },
+  
   
   'test .del()': function(done){
     client.del('/test/user.json').on('response', function(res){
