@@ -10,7 +10,7 @@
   },
   "repository": "git://github.com/LearnBoost/knox.git",
   "dependencies": {
-    "xml2json": "~0.2.4"
+    "mime": "~1.2.5"
   },
   "devDependencies": {
     "mocha": "1.0.x"
