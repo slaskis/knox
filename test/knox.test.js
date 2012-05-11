@@ -8,10 +8,10 @@ var assert = require('assert')
   , fs = require('fs');
 
 try {
-  var auth = JSON.parse(fs.readFileSync('auth', 'ascii'));
-  var client = knox.createClient(auth[0]);
-  var other = knox.createClient(auth[1]);
-  var invalid = knox.createClient(auth[2]);
+  var auth = JSON.parse(fs.readFileSync('auth', 'ascii'))
+    , client = knox.createClient(auth[0])
+    , other = knox.createClient(auth[1])
+    , invalid = knox.createClient(auth[2]);
 } catch (err) {
   console.error('`make test` requires ./auth to contain a JSON string with');
   console.error('`key, secret, and bucket in order to run tests.');
@@ -157,6 +157,33 @@ module.exports = {
       assert.ok(err);
       done();
     })
+  },
+
+  // this is a regression test for a
+  // "Error: Not initialized"-exception
+  'test .createWriteStream() with a write loop': function(done){
+
+    var file = fs.readFileSync(__dirname+'/fixtures/image-big.jpg')
+      , type = 'image/jpeg'
+      , path = '/bugs/scalablejs/no-sha.jpeg';
+
+    assert(Buffer.isBuffer(file))
+
+    var out = client.createWriteStream(path,{'Content-Type':type})
+    out.on('response',function(res){
+      assert.equals(res.statusCode,200)
+      done()
+    })
+
+    // write in 5mb chunks
+    var size = Math.min((5 * 1024 * 1024),file.length)
+      , i = 0;
+    while( i < file.length ){
+      var buf = file.slice(i,Math.min(i+size,file.length))
+      out.write(buf);
+      i += size;
+    }
+    out.end();
   },
 
   'test .createWriteStream() >5MB (file)': function(done){
