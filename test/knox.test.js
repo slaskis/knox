@@ -108,6 +108,7 @@ module.exports = {
   },
   
   'test .putStream()': function(done){
+    this.timeout(3000);
     var stream = fs.createReadStream(jsonFixture)
       , size = fs.statSync(jsonFixture).size;
       
@@ -131,6 +132,7 @@ module.exports = {
   },
 
   'test .createWriteStream()': function(done){
+    this.timeout(3000);
     var stream = fs.createReadStream(jsonFixture)
       , size = fs.statSync(jsonFixture).size;
 
@@ -161,29 +163,36 @@ module.exports = {
 
   // this is a regression test for a
   // "Error: Not initialized"-exception
-  'test .createWriteStream() with a write loop': function(done){
+  // being thrown when md5 is being "digested" 
+  // a second time. caused by the "drain"-event
+  'test .createWriteStream() >5MB (write loop)': function(done){
+    this.timeout(5 * 60 * 1000); // 5 minutes to upload 5MB
 
     var file = fs.readFileSync(__dirname+'/fixtures/image-big.jpg')
       , type = 'image/jpeg'
-      , path = '/bugs/scalablejs/no-sha.jpeg';
+      , path = '/test/md5-bug.jpeg';
 
     assert(Buffer.isBuffer(file))
 
-    var out = client.createWriteStream(path,{'Content-Type':type})
-    out.on('response',function(res){
-      assert.equals(res.statusCode,200)
-      done()
+    var multipart = client.createWriteStream(path,{'Content-Type':type})
+    multipart.on('response',function(res){
+      assert.equal(res.statusCode,200)
+      client.headFile(path,function(err,res){
+        assert.equal(file.length,Number(res.headers['content-length']))
+        done()
+      })
     })
+    multipart.on('error',done)
 
     // write in 5mb chunks
     var size = Math.min((5 * 1024 * 1024),file.length)
       , i = 0;
     while( i < file.length ){
       var buf = file.slice(i,Math.min(i+size,file.length))
-      out.write(buf);
+      multipart.write(buf);
       i += size;
     }
-    out.end();
+    multipart.end();
   },
 
   'test .createWriteStream() >5MB (file)': function(done){
