@@ -5,7 +5,7 @@
 
 ## Features
 
-  - Not outdated :), developed for node 0.2.x
+  - Not outdated :), developed for node 0.2.x and still passes all the tests with node 0.8.x
   - RESTful api (`client.get()`, `client.put()`, etc)
   - Uses node's crypto library (fast!, the others used native js)
   - Very node-like low-level request api via `http.Client`
